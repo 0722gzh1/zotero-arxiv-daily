@@ -11,8 +11,6 @@ class BiorxivRetriever(BaseRetriever):
 
     def __init__(self, config):
         super().__init__(config)
-        if self.retriever_config.category is None:
-            raise ValueError(f"category must be specified for {self.name}")
 
     def _retrieve_raw_papers(self) -> list[dict[str, Any]]:
         api_url = f"https://api.biorxiv.org/details/{self.server}/2d"
@@ -37,8 +35,6 @@ class BiorxivRetriever(BaseRetriever):
         all_dates = set(c['date'] for c in collection)
         latest_date = sorted(all_dates)[-1]
         collection = [c for c in collection if c['date'] == latest_date]
-        categories = [c.lower() for c in self.retriever_config.category]
-        collection = [c for c in collection if c['category'] in categories]
         if self.config.executor.debug:
             collection = collection[:10]
         return collection

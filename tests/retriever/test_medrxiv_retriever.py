@@ -12,6 +12,13 @@ def test_medrxiv_server_attribute(config):
     assert retriever.server == "medrxiv"
 
 
+def test_medrxiv_does_not_require_category(config):
+    with open_dict(config.source):
+        config.source.medrxiv = {"category": None}
+    retriever = MedrxivRetriever(config)
+    assert retriever.retriever_config.category is None
+
+
 def test_medrxiv_pdf_url(config):
     with open_dict(config.source):
         config.source.medrxiv = {"category": ["neurology"]}

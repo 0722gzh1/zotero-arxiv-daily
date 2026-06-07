@@ -1,6 +1,5 @@
 """Tests for BiorxivRetriever."""
 
-import pytest
 from omegaconf import open_dict
 
 from zotero_arxiv_daily.retriever.biorxiv_retriever import BiorxivRetriever
@@ -13,9 +12,9 @@ def test_biorxiv_retrieve(config, mock_biorxiv_api, monkeypatch):
         config.source.biorxiv = {"category": ["bioinformatics"]}
     retriever = BiorxivRetriever(config)
     papers = retriever.retrieve_papers()
-    # Only latest date + matching category
-    assert len(papers) == 1
-    assert papers[0].title == "A biorxiv paper"
+    # Only latest date. bioRxiv categories are intentionally not filtered.
+    assert len(papers) == 2
+    assert [p.title for p in papers] == ["A biorxiv paper", "Another biorxiv paper"]
 
 
 def test_biorxiv_empty_response(config, monkeypatch):
@@ -51,8 +50,8 @@ def test_biorxiv_convert_to_paper(config):
     assert paper.authors == ["Smith, J.", "Doe, A.", "Lee, K."]
 
 
-def test_biorxiv_requires_category(config):
+def test_biorxiv_does_not_require_category(config):
     with open_dict(config.source):
         config.source.biorxiv = {"category": None}
-    with pytest.raises(ValueError, match="category must be specified"):
-        BiorxivRetriever(config)
+    retriever = BiorxivRetriever(config)
+    assert retriever.retriever_config.category is None
