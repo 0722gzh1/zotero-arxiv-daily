@@ -9,6 +9,12 @@ import json
 RawPaperItem = TypeVar('RawPaperItem')
 
 @dataclass
+class RelatedPaper:
+    title: str
+    score: float
+
+
+@dataclass
 class Paper:
     source: str
     title: str
@@ -20,6 +26,7 @@ class Paper:
     tldr: Optional[str] = None
     affiliations: Optional[list[str]] = None
     score: Optional[float] = None
+    related_papers: Optional[list[RelatedPaper]] = None
 
     def _generate_tldr_with_llm(self, openai_client:OpenAI,llm_params:dict) -> str:
         lang = llm_params.get('language', 'English')
@@ -109,3 +116,54 @@ class CorpusPaper:
     abstract: str
     added_date: datetime
     paths: list[str]
+
+
+def _generate_daily_overview_with_llm(openai_client:OpenAI,llm_params:dict,papers:list[Paper]) -> str:
+    lang = llm_params.get('language', 'English')
+    prompt = (
+        f"Write a concise daily research briefing in {lang} from the recommended papers below. "
+        "Focus on helping the reader understand today's new research progress in their field. "
+        "Include: 1) main themes, 2) notable methods or findings, and 3) papers worth reading first. "
+        "Do not invent details beyond the provided titles, abstracts, TLDRs, and relevance evidence.\n\n"
+    )
+    for i, paper in enumerate(papers, start=1):
+        prompt += f"Paper {i}\n"
+        prompt += f"Source: {paper.source}\n"
+        prompt += f"Title: {paper.title}\n"
+        if paper.score is not None:
+            prompt += f"Relevance score: {paper.score:.2f}\n"
+        if paper.tldr:
+            prompt += f"TLDR: {paper.tldr}\n"
+        elif paper.abstract:
+            prompt += f"Abstract: {paper.abstract}\n"
+        if paper.related_papers:
+            matches = "; ".join(f"{match.title} ({match.score:.1f})" for match in paper.related_papers[:3])
+            prompt += f"Closest Zotero matches: {matches}\n"
+        prompt += "\n"
+
+    enc = tiktoken.encoding_for_model("gpt-4o")
+    prompt_tokens = enc.encode(prompt)
+    prompt_tokens = prompt_tokens[:6000]
+    prompt = enc.decode(prompt_tokens)
+
+    response = openai_client.chat.completions.create(
+        messages=[
+            {
+                "role": "system",
+                "content": "You are a research assistant who writes compact daily briefings for an expert researcher.",
+            },
+            {"role": "user", "content": prompt},
+        ],
+        **llm_params.get('generation_kwargs', {})
+    )
+    return response.choices[0].message.content
+
+
+def generate_daily_overview(openai_client:OpenAI,llm_params:dict,papers:list[Paper]) -> Optional[str]:
+    if len(papers) == 0:
+        return None
+    try:
+        return _generate_daily_overview_with_llm(openai_client,llm_params,papers)
+    except Exception as e:
+        logger.warning(f"Failed to generate daily overview: {e}")
+        return None

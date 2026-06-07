@@ -1,6 +1,7 @@
 """Tests for zotero_arxiv_daily.construct_email: render_email, get_stars, get_block_html."""
 
 from zotero_arxiv_daily.construct_email import render_email, get_stars, get_block_html, get_empty_html
+from zotero_arxiv_daily.protocol import RelatedPaper
 from tests.canned_responses import make_sample_paper
 
 
@@ -10,6 +11,19 @@ def test_render_email_with_papers():
     assert "Sample Paper Title" in html
     assert "A great paper." in html
     assert "MIT" in html
+
+
+def test_render_email_with_daily_overview_and_related_papers():
+    paper = make_sample_paper(
+        score=7.5,
+        tldr="A great paper.",
+        related_papers=[RelatedPaper(title="Relevant Zotero Paper", score=8.2)],
+    )
+    html = render_email([paper], daily_overview="Today focuses on protein design.")
+    assert "Daily Research Briefing" in html
+    assert "Today focuses on protein design." in html
+    assert "Relevant Zotero Paper" in html
+    assert "Recommended because" in html
 
 
 def test_render_email_empty_list():

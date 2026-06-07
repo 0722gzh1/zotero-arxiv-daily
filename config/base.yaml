@@ -33,6 +33,7 @@ llm:
 reranker:
   relevance:
     top_k: 20 # Score each candidate by its closest Zotero papers instead of averaging over the entire library.
+    match_count: 3 # Number of closest Zotero papers shown as recommendation evidence in the email.
     best_similarity_weight: 0.3 # Blend in the single best Zotero match. Must be between 0 and 1.
     time_decay_strength: 0.15 # Lightly prefer Zotero papers added recently. Set 0 to disable.
   local:
@@ -52,5 +53,7 @@ executor:
   send_empty: false # Whether to send an empty email even if no new papers today. Example: true
   max_paper_num: 100 # The maximum number of the papers presented in the email. Example: 100
   min_relevance_score: null # Minimum relevance score required to send a paper. Example: 6.0
+  daily_overview: true # Whether to generate a daily research briefing at the top of the email.
+  overview_paper_num: 12 # Number of top-ranked papers included in the daily research briefing prompt.
   source: ??? # The sources of papers to retrieve. Example: ['arxiv','biorxiv','medrxiv']
   reranker: local # The reranker to use. Example: 'local' or 'api'

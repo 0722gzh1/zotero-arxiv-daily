@@ -1,5 +1,6 @@
 from .protocol import Paper
 import math
+from html import escape
 
 
 framework = """
@@ -52,7 +53,42 @@ def get_empty_html():
   """
   return block_template
 
-def get_block_html(title:str, authors:str, rate:str, tldr:str, pdf_url:str, affiliations:str=None):
+def text_to_html(text:str | None) -> str:
+    if not text:
+        return ""
+    return "<br>".join(escape(str(text)).splitlines())
+
+
+def get_overview_html(daily_overview:str | None):
+    if not daily_overview:
+        return ""
+    block_template = """
+    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="font-family: Arial, sans-serif; border: 1px solid #cfd8dc; border-radius: 8px; padding: 16px; background-color: #eef7f8;">
+    <tr>
+        <td style="font-size: 20px; font-weight: bold; color: #263238;">
+            Daily Research Briefing
+        </td>
+    </tr>
+    <tr>
+        <td style="font-size: 14px; color: #263238; padding: 10px 0 0 0; line-height: 1.5;">
+            {daily_overview}
+        </td>
+    </tr>
+</table>
+"""
+    return block_template.format(daily_overview=text_to_html(daily_overview))
+
+
+def get_related_papers_html(paper:Paper) -> str:
+    if not paper.related_papers:
+        return ""
+    items = []
+    for related in paper.related_papers[:3]:
+        items.append(f"{escape(related.title)} ({related.score:.1f})")
+    return "; ".join(items)
+
+
+def get_block_html(title:str, authors:str, rate:str, tldr:str, pdf_url:str, affiliations:str=None, source:str=None, related_papers:str=None):
     block_template = """
     <table border="0" cellpadding="0" cellspacing="0" width="100%" style="font-family: Arial, sans-serif; border: 1px solid #ddd; border-radius: 8px; padding: 16px; background-color: #f9f9f9;">
     <tr>
@@ -69,7 +105,10 @@ def get_block_html(title:str, authors:str, rate:str, tldr:str, pdf_url:str, affi
     </tr>
     <tr>
         <td style="font-size: 14px; color: #333; padding: 8px 0;">
+            <strong>Source:</strong> {source}<br>
             <strong>Relevance:</strong> {rate}
+            <br>
+            <strong>Recommended because:</strong> closest to Zotero papers: {related_papers}
         </td>
     </tr>
     <tr>
@@ -85,11 +124,20 @@ def get_block_html(title:str, authors:str, rate:str, tldr:str, pdf_url:str, affi
     </tr>
 </table>
 """
-    return block_template.format(title=title, authors=authors,rate=rate, tldr=tldr, pdf_url=pdf_url, affiliations=affiliations)
+    return block_template.format(
+        title=text_to_html(title),
+        authors=text_to_html(authors),
+        rate=text_to_html(rate),
+        tldr=text_to_html(tldr),
+        pdf_url=escape(str(pdf_url)),
+        affiliations=text_to_html(affiliations),
+        source=text_to_html(source or "Unknown"),
+        related_papers=related_papers or "No close Zotero match recorded",
+    )
 
 def get_stars(score:float):
-    full_star = '<span class="full-star">⭐</span>'
-    half_star = '<span class="half-star">⭐</span>'
+    full_star = '<span class="full-star">&#9733;</span>'
+    half_star = '<span class="half-star">&#9733;</span>'
     low = 6
     high = 8
     if score <= low:
@@ -104,10 +152,14 @@ def get_stars(score:float):
         return '<div class="star-wrapper">'+full_star * full_star_num + half_star * half_star_num + '</div>'
 
 
-def render_email(papers:list[Paper]) -> str:
+def render_email(papers:list[Paper], daily_overview:str | None=None) -> str:
     parts = []
     if len(papers) == 0 :
         return framework.replace('__CONTENT__', get_empty_html())
+
+    overview_html = get_overview_html(daily_overview)
+    if overview_html:
+        parts.append(overview_html)
     
     for p in papers:
         #rate = get_stars(p.score)
@@ -125,7 +177,8 @@ def render_email(papers:list[Paper]) -> str:
                 affiliations += ', ...'
         else:
             affiliations = 'Unknown Affiliation'
-        parts.append(get_block_html(p.title, authors, rate, p.tldr, p.pdf_url, affiliations))
+        related_papers = get_related_papers_html(p)
+        parts.append(get_block_html(p.title, authors, rate, p.tldr, p.pdf_url, affiliations, p.source, related_papers))
 
     content = '<br>' + '</br><br>'.join(parts) + '</br>'
     return framework.replace('__CONTENT__', content)

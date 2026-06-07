@@ -3,7 +3,7 @@ from pyzotero import zotero
 from omegaconf import DictConfig, ListConfig
 from .utils import glob_match
 from .retriever import get_retriever_cls
-from .protocol import CorpusPaper
+from .protocol import CorpusPaper, generate_daily_overview
 import random
 from datetime import datetime
 from .reranker import get_reranker_cls
@@ -116,6 +116,7 @@ class Executor:
             all_papers.extend(papers)
         logger.info(f"Total {len(all_papers)} papers retrieved from all sources")
         reranked_papers = []
+        daily_overview = None
         if len(all_papers) > 0:
             logger.info("Reranking papers...")
             reranked_papers = self.reranker.rerank(all_papers, corpus)
@@ -134,10 +135,18 @@ class Executor:
             for p in tqdm(reranked_papers):
                 p.generate_tldr(self.openai_client, self.config.llm)
                 p.generate_affiliations(self.openai_client, self.config.llm)
+            if self.config.executor.get("daily_overview", True):
+                overview_paper_num = self.config.executor.get("overview_paper_num", 12)
+                logger.info("Generating daily overview...")
+                daily_overview = generate_daily_overview(
+                    self.openai_client,
+                    self.config.llm,
+                    reranked_papers[:overview_paper_num],
+                )
         elif not self.config.executor.send_empty:
             logger.info("No new papers found. No email will be sent.")
             return
         logger.info("Sending email...")
-        email_content = render_email(reranked_papers)
+        email_content = render_email(reranked_papers, daily_overview=daily_overview)
         send_email(self.config, email_content)
         logger.info("Email sent successfully")

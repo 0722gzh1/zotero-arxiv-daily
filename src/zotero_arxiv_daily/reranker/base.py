@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from omegaconf import DictConfig
-from ..protocol import Paper, CorpusPaper
+from ..protocol import Paper, CorpusPaper, RelatedPaper
 import numpy as np
 from typing import Type
 class BaseReranker(ABC):
@@ -14,12 +14,20 @@ class BaseReranker(ABC):
         relevance_config = reranker_config.get("relevance", {}) if reranker_config else {}
         return relevance_config.get(key, default) if relevance_config else default
 
+    def _paper_embedding_text(self, paper: Paper | CorpusPaper) -> str:
+        return f"Title: {paper.title}\nAbstract: {paper.abstract}"
+
     def rerank(self, candidates:list[Paper], corpus:list[CorpusPaper]) -> list[Paper]:
         corpus = sorted(corpus,key=lambda x: x.added_date,reverse=True)
-        sim = self.get_similarity_score([c.abstract for c in candidates], [c.abstract for c in corpus])
+        sim = self.get_similarity_score(
+            [self._paper_embedding_text(c) for c in candidates],
+            [self._paper_embedding_text(c) for c in corpus]
+        )
         assert sim.shape == (len(candidates), len(corpus))
         top_k = max(1, int(self._get_relevance_setting("top_k", 20)))
         top_k = min(top_k, len(corpus))
+        match_count = max(1, int(self._get_relevance_setting("match_count", 3)))
+        match_count = min(match_count, len(corpus))
         best_similarity_weight = float(self._get_relevance_setting("best_similarity_weight", 0.3))
         if not 0 <= best_similarity_weight <= 1:
             raise ValueError("reranker.relevance.best_similarity_weight must be between 0 and 1.")
@@ -39,6 +47,15 @@ class BaseReranker(ABC):
         scores = ((1 - best_similarity_weight) * top_weighted_sim + best_similarity_weight * best_sim) * 10
         for s,c in zip(scores,candidates):
             c.score = s
+        match_indices = np.argsort(sim, axis=1)[:, -match_count:][:, ::-1]
+        for candidate_index, candidate in enumerate(candidates):
+            candidate.related_papers = [
+                RelatedPaper(
+                    title=corpus[corpus_index].title,
+                    score=float(sim[candidate_index, corpus_index] * 10),
+                )
+                for corpus_index in match_indices[candidate_index]
+            ]
         candidates = sorted(candidates,key=lambda x: x.score,reverse=True)
         return candidates
     
