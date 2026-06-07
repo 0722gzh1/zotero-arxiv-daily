@@ -2,6 +2,7 @@
 
 import numpy as np
 import pytest
+from omegaconf import OmegaConf
 
 from zotero_arxiv_daily.reranker.base import BaseReranker, get_reranker_cls
 from tests.canned_responses import make_sample_paper, make_sample_corpus
@@ -10,8 +11,8 @@ from tests.canned_responses import make_sample_paper, make_sample_corpus
 class StubReranker(BaseReranker):
     """Reranker with a controlled similarity matrix for deterministic tests."""
 
-    def __init__(self, sim_matrix: np.ndarray):
-        self.config = None
+    def __init__(self, sim_matrix: np.ndarray, config=None):
+        self.config = config
         self._sim = sim_matrix
 
     def get_similarity_score(self, s1, s2):
@@ -53,6 +54,32 @@ def test_rerank_time_decay_weighting():
 
     # Newest corpus paper gets higher time-decay weight, so score should be higher
     assert score_new > score_old
+
+
+def test_rerank_prefers_strong_nearest_neighbors_over_broad_matches():
+    corpus = make_sample_corpus(6)
+    papers = [
+        make_sample_paper(title="Broad Match"),
+        make_sample_paper(title="Focused Match"),
+    ]
+    sim = np.array([
+        [0.50, 0.50, 0.50, 0.50, 0.50, 0.50],
+        [0.95, 0.20, 0.20, 0.20, 0.20, 0.20],
+    ])
+    config = OmegaConf.create({
+        "reranker": {
+            "relevance": {
+                "top_k": 2,
+                "best_similarity_weight": 0.3,
+                "time_decay_strength": 0.0,
+            }
+        }
+    })
+    reranker = StubReranker(sim, config)
+    ranked = reranker.rerank(papers, corpus)
+
+    assert ranked[0].title == "Focused Match"
+    assert ranked[0].score > ranked[1].score
 
 
 def test_rerank_single_candidate_single_corpus():

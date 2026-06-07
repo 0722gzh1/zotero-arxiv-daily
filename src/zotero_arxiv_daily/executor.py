@@ -89,6 +89,15 @@ class Executor:
             logger.info(f"Selected {len(corpus)} zotero papers:\n{samples}\n...")
         return corpus
 
+    def filter_by_relevance_score(self, papers):
+        min_score = self.config.executor.get("min_relevance_score")
+        if min_score is None:
+            return papers
+
+        filtered = [p for p in papers if p.score is not None and p.score >= min_score]
+        logger.info(f"Selected {len(filtered)} of {len(papers)} papers with relevance score >= {min_score}")
+        return filtered
+
     
     def run(self):
         corpus = self.fetch_zotero_corpus()
@@ -110,7 +119,17 @@ class Executor:
         if len(all_papers) > 0:
             logger.info("Reranking papers...")
             reranked_papers = self.reranker.rerank(all_papers, corpus)
+            scores = [p.score for p in reranked_papers if p.score is not None]
+            if scores:
+                logger.info(
+                    f"Relevance score range: max={max(scores):.2f}, "
+                    f"min={min(scores):.2f}, mean={sum(scores) / len(scores):.2f}"
+                )
+            reranked_papers = self.filter_by_relevance_score(reranked_papers)
             reranked_papers = reranked_papers[:self.config.executor.max_paper_num]
+            if len(reranked_papers) == 0 and not self.config.executor.send_empty:
+                logger.info("No papers passed the relevance threshold. No email will be sent.")
+                return
             logger.info("Generating TLDR and affiliations...")
             for p in tqdm(reranked_papers):
                 p.generate_tldr(self.openai_client, self.config.llm)

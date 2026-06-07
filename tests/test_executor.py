@@ -99,6 +99,37 @@ def test_filter_corpus_no_filters_returns_all():
     assert filtered == corpus
 
 
+def test_filter_by_relevance_score_filters_low_scores():
+    from tests.canned_responses import make_sample_paper
+
+    executor = Executor.__new__(Executor)
+    executor.config = OmegaConf.create({"executor": {"min_relevance_score": 6.0}})
+    papers = [
+        make_sample_paper(title="Low", score=5.9),
+        make_sample_paper(title="High", score=6.1),
+        make_sample_paper(title="Unknown", score=None),
+    ]
+
+    filtered = executor.filter_by_relevance_score(papers)
+
+    assert [p.title for p in filtered] == ["High"]
+
+
+def test_filter_by_relevance_score_disabled_returns_all():
+    from tests.canned_responses import make_sample_paper
+
+    executor = Executor.__new__(Executor)
+    executor.config = OmegaConf.create({"executor": {"min_relevance_score": None}})
+    papers = [
+        make_sample_paper(title="Low", score=5.9),
+        make_sample_paper(title="Unknown", score=None),
+    ]
+
+    filtered = executor.filter_by_relevance_score(papers)
+
+    assert filtered == papers
+
+
 # ---------------------------------------------------------------------------
 # fetch_zotero_corpus
 # ---------------------------------------------------------------------------

@@ -31,6 +31,10 @@ llm:
   language: English # Preferred language for the TL;DR. Example: English
 
 reranker:
+  relevance:
+    top_k: 20 # Score each candidate by its closest Zotero papers instead of averaging over the entire library.
+    best_similarity_weight: 0.3 # Blend in the single best Zotero match. Must be between 0 and 1.
+    time_decay_strength: 0.15 # Lightly prefer Zotero papers added recently. Set 0 to disable.
   local:
     model: jinaai/jina-embeddings-v5-text-nano-retrieval # The Hugging Face model name of the local embedding model. Example: jinaai/jina-embeddings-v5-text-nano
     encode_kwargs:
@@ -47,5 +51,6 @@ executor:
   debug: false # Whether to use debug mode. Example: true
   send_empty: false # Whether to send an empty email even if no new papers today. Example: true
   max_paper_num: 100 # The maximum number of the papers presented in the email. Example: 100
+  min_relevance_score: null # Minimum relevance score required to send a paper. Example: 6.0
   source: ??? # The sources of papers to retrieve. Example: ['arxiv','biorxiv','medrxiv']
   reranker: local # The reranker to use. Example: 'local' or 'api'
