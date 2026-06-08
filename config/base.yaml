@@ -32,9 +32,9 @@ llm:
 
 reranker:
   relevance:
-    top_k: 20 # Score each candidate by its closest Zotero papers instead of averaging over the entire library.
+    top_k: 10 # Score each candidate by its closest Zotero papers instead of averaging over the entire library.
     match_count: 3 # Number of closest Zotero papers shown as recommendation evidence in the email.
-    best_similarity_weight: 0.3 # Blend in the single best Zotero match. Must be between 0 and 1.
+    best_similarity_weight: 0.0 # Blend in the single best Zotero match. Must be between 0 and 1.
     time_decay_strength: 0.15 # Lightly prefer Zotero papers added recently. Set 0 to disable.
   local:
     model: jinaai/jina-embeddings-v5-text-nano-retrieval # The Hugging Face model name of the local embedding model. Example: jinaai/jina-embeddings-v5-text-nano
@@ -53,6 +53,10 @@ executor:
   send_empty: false # Whether to send an empty email even if no new papers today. Example: true
   max_paper_num: 100 # The maximum number of the papers presented in the email. Example: 100
   min_relevance_score: null # Minimum relevance score required to send a paper. Example: 6.0
+  theme_judge: true # Whether to use LLM to filter papers by true research-theme match.
+  theme_judge_paper_num: 30 # Number of top embedding-ranked papers judged by the LLM theme filter.
+  min_theme_score: 7.0 # Minimum LLM theme score required to send a paper.
+  theme_judge_keep_on_failure: false # Whether to keep a paper if LLM theme judging fails.
   daily_overview: true # Whether to generate a daily research briefing at the top of the email.
   overview_paper_num: 12 # Number of top-ranked papers included in the daily research briefing prompt.
   source: ??? # The sources of papers to retrieve. Example: ['arxiv','biorxiv','medrxiv']

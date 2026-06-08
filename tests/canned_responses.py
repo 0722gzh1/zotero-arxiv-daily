@@ -11,7 +11,9 @@ from zotero_arxiv_daily.protocol import CorpusPaper, Paper
 # ---------------------------------------------------------------------------
 
 _AFFILIATION_MARKER = "You are an assistant who perfectly extracts affiliations"
+_THEME_MARKER = "Judge whether the candidate paper is truly in the same research theme"
 _AFFILIATION_RESPONSE = '["TsingHua University","Peking University"]'
+_THEME_RESPONSE = '{"theme_score": 8.0, "decision": "keep", "reason": "The candidate matches the Zotero research theme."}'
 _TLDR_RESPONSE = "Hello! How can I assist you today?"
 
 
@@ -36,6 +38,8 @@ def _stub_chat_create(**kwargs):
     request_str = str(messages)
     if _AFFILIATION_MARKER in request_str:
         return _make_chat_response(_AFFILIATION_RESPONSE)
+    if _THEME_MARKER in request_str:
+        return _make_chat_response(_THEME_RESPONSE)
     return _make_chat_response(_TLDR_RESPONSE)
 
 

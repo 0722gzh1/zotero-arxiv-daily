@@ -53,6 +53,7 @@ class BaseReranker(ABC):
                 RelatedPaper(
                     title=corpus[corpus_index].title,
                     score=float(sim[candidate_index, corpus_index] * 10),
+                    abstract=corpus[corpus_index].abstract,
                 )
                 for corpus_index in match_indices[candidate_index]
             ]

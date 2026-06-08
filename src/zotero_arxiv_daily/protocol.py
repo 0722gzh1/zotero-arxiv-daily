@@ -12,6 +12,14 @@ RawPaperItem = TypeVar('RawPaperItem')
 class RelatedPaper:
     title: str
     score: float
+    abstract: Optional[str] = None
+
+
+@dataclass
+class ThemeReview:
+    theme_score: float
+    keep: bool
+    reason: str
 
 
 @dataclass
@@ -27,6 +35,7 @@ class Paper:
     affiliations: Optional[list[str]] = None
     score: Optional[float] = None
     related_papers: Optional[list[RelatedPaper]] = None
+    theme_review: Optional[ThemeReview] = None
 
     def _generate_tldr_with_llm(self, openai_client:OpenAI,llm_params:dict) -> str:
         lang = llm_params.get('language', 'English')
@@ -110,6 +119,69 @@ class Paper:
             logger.warning(f"Failed to generate affiliations of {self.url}: {e}")
             self.affiliations = None
             return None
+
+    def _generate_theme_review_with_llm(self, openai_client:OpenAI,llm_params:dict) -> ThemeReview:
+        lang = llm_params.get('language', 'English')
+        prompt = (
+            "Judge whether the candidate paper is truly in the same research theme as the closest Zotero papers. "
+            "Do not keep a paper just because it shares generic method words such as AI, model, optimization, embedding, "
+            "Bayesian optimization, generative design, cancer, protein, or cell. The primary research object, task, "
+            "biological context, and contribution must be aligned. For example, oncology drug-combination optimization "
+            "and protein engineering should be considered different themes unless the candidate explicitly studies the "
+            "same protein-engineering problem.\n\n"
+            "Return only a JSON object with keys: theme_score, decision, reason. "
+            "theme_score is 0 to 10. decision must be keep or drop. reason should be one concise sentence "
+            f"in {lang}.\n\n"
+            f"Candidate title: {self.title}\n"
+            f"Candidate abstract: {self.abstract}\n\n"
+            "Closest Zotero papers:\n"
+        )
+        if self.related_papers:
+            for i, related in enumerate(self.related_papers[:3], start=1):
+                prompt += f"{i}. Title: {related.title}\n"
+                prompt += f"   Similarity score: {related.score:.1f}\n"
+                if related.abstract:
+                    prompt += f"   Abstract: {related.abstract[:1600]}\n"
+        else:
+            prompt += "None recorded.\n"
+
+        enc = tiktoken.encoding_for_model("gpt-4o")
+        prompt_tokens = enc.encode(prompt)
+        prompt_tokens = prompt_tokens[:5000]
+        prompt = enc.decode(prompt_tokens)
+
+        response = openai_client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a strict research-topic relevance judge for an expert scientist.",
+                },
+                {"role": "user", "content": prompt},
+            ],
+            **llm_params.get('generation_kwargs', {})
+        )
+        content = response.choices[0].message.content or ""
+        json_match = re.search(r'\{.*\}', content, flags=re.DOTALL)
+        if json_match is None:
+            raise ValueError(f"No JSON object found in theme review response: {content}")
+        data = json.loads(json_match.group(0))
+        theme_score = float(data.get("theme_score", 0))
+        decision = str(data.get("decision", "drop")).strip().lower()
+        reason = str(data.get("reason", "")).strip()
+        return ThemeReview(
+            theme_score=theme_score,
+            keep=decision == "keep",
+            reason=reason,
+        )
+
+    def generate_theme_review(self, openai_client:OpenAI,llm_params:dict) -> Optional[ThemeReview]:
+        try:
+            self.theme_review = self._generate_theme_review_with_llm(openai_client,llm_params)
+            return self.theme_review
+        except Exception as e:
+            logger.warning(f"Failed to generate theme review of {self.url}: {e}")
+            self.theme_review = None
+            return None
 @dataclass
 class CorpusPaper:
     title: str
@@ -139,6 +211,9 @@ def _generate_daily_overview_with_llm(openai_client:OpenAI,llm_params:dict,paper
         if paper.related_papers:
             matches = "; ".join(f"{match.title} ({match.score:.1f})" for match in paper.related_papers[:3])
             prompt += f"Closest Zotero matches: {matches}\n"
+        if paper.theme_review:
+            prompt += f"Theme score: {paper.theme_review.theme_score:.1f}\n"
+            prompt += f"Theme reason: {paper.theme_review.reason}\n"
         prompt += "\n"
 
     enc = tiktoken.encoding_for_model("gpt-4o")

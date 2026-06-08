@@ -88,7 +88,17 @@ def get_related_papers_html(paper:Paper) -> str:
     return "; ".join(items)
 
 
-def get_block_html(title:str, authors:str, rate:str, tldr:str, pdf_url:str, affiliations:str=None, source:str=None, related_papers:str=None):
+def get_theme_review_html(paper:Paper) -> str:
+    if paper.theme_review is None:
+        return ""
+    decision = "keep" if paper.theme_review.keep else "drop"
+    return (
+        f"<br><strong>Theme match:</strong> {paper.theme_review.theme_score:.1f}/10 ({decision})"
+        f"<br><strong>Theme reason:</strong> {text_to_html(paper.theme_review.reason)}"
+    )
+
+
+def get_block_html(title:str, authors:str, rate:str, tldr:str, pdf_url:str, affiliations:str=None, source:str=None, related_papers:str=None, theme_review:str=None):
     block_template = """
     <table border="0" cellpadding="0" cellspacing="0" width="100%" style="font-family: Arial, sans-serif; border: 1px solid #ddd; border-radius: 8px; padding: 16px; background-color: #f9f9f9;">
     <tr>
@@ -109,6 +119,7 @@ def get_block_html(title:str, authors:str, rate:str, tldr:str, pdf_url:str, affi
             <strong>Relevance:</strong> {rate}
             <br>
             <strong>Recommended because:</strong> closest to Zotero papers: {related_papers}
+            {theme_review}
         </td>
     </tr>
     <tr>
@@ -133,6 +144,7 @@ def get_block_html(title:str, authors:str, rate:str, tldr:str, pdf_url:str, affi
         affiliations=text_to_html(affiliations),
         source=text_to_html(source or "Unknown"),
         related_papers=related_papers or "No close Zotero match recorded",
+        theme_review=theme_review or "",
     )
 
 def get_stars(score:float):
@@ -178,7 +190,8 @@ def render_email(papers:list[Paper], daily_overview:str | None=None) -> str:
         else:
             affiliations = 'Unknown Affiliation'
         related_papers = get_related_papers_html(p)
-        parts.append(get_block_html(p.title, authors, rate, p.tldr, p.pdf_url, affiliations, p.source, related_papers))
+        theme_review = get_theme_review_html(p)
+        parts.append(get_block_html(p.title, authors, rate, p.tldr, p.pdf_url, affiliations, p.source, related_papers, theme_review))
 
     content = '<br>' + '</br><br>'.join(parts) + '</br>'
     return framework.replace('__CONTENT__', content)

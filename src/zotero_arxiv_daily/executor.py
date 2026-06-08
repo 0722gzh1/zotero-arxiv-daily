@@ -98,6 +98,20 @@ class Executor:
         logger.info(f"Selected {len(filtered)} of {len(papers)} papers with relevance score >= {min_score}")
         return filtered
 
+    def filter_by_theme_review(self, papers):
+        min_theme_score = self.config.executor.get("min_theme_score", 7.0)
+        keep_on_failure = self.config.executor.get("theme_judge_keep_on_failure", False)
+        filtered = []
+        for paper in papers:
+            if paper.theme_review is None:
+                if keep_on_failure:
+                    filtered.append(paper)
+                continue
+            if paper.theme_review.keep and paper.theme_review.theme_score >= min_theme_score:
+                filtered.append(paper)
+        logger.info(f"Selected {len(filtered)} of {len(papers)} papers with theme score >= {min_theme_score}")
+        return filtered
+
     
     def run(self):
         corpus = self.fetch_zotero_corpus()
@@ -127,9 +141,16 @@ class Executor:
                     f"min={min(scores):.2f}, mean={sum(scores) / len(scores):.2f}"
                 )
             reranked_papers = self.filter_by_relevance_score(reranked_papers)
+            if self.config.executor.get("theme_judge", True):
+                theme_judge_paper_num = self.config.executor.get("theme_judge_paper_num", 30)
+                reranked_papers = reranked_papers[:theme_judge_paper_num]
+                logger.info("Judging topic-level relevance...")
+                for p in tqdm(reranked_papers):
+                    p.generate_theme_review(self.openai_client, self.config.llm)
+                reranked_papers = self.filter_by_theme_review(reranked_papers)
             reranked_papers = reranked_papers[:self.config.executor.max_paper_num]
             if len(reranked_papers) == 0 and not self.config.executor.send_empty:
-                logger.info("No papers passed the relevance threshold. No email will be sent.")
+                logger.info("No papers passed the relevance/theme thresholds. No email will be sent.")
                 return
             logger.info("Generating TLDR and affiliations...")
             for p in tqdm(reranked_papers):
