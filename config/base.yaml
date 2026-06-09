@@ -13,6 +13,21 @@ source:
   medrxiv:
     category: null # Ignored. medRxiv retrieves all papers from the latest date returned by its 2-day API window.
 
+topic_profiles:
+  enabled: false # Whether to judge papers against explicit research-interest topic profiles.
+  auto_generate: true # Generate temporary profiles from the Zotero corpus on each workflow run.
+  min_topics: 2 # Lower bound for automatically inferred topic count.
+  max_topics: 8 # Upper bound for automatically inferred topic count.
+  max_papers_for_profile: 80 # Zotero papers summarized into the temporary profile prompt.
+  path: config/topic_profiles.yaml # Optional YAML file used when auto_generate is false and topics is empty.
+  refresh_days: 30 # Reserved for future automatic topic refresh.
+  match_top_n: 3 # Number of candidate topic profiles attached to each paper before LLM judging.
+  topics: [] # Optional inline topic profile list. If empty, topic_profiles.path is used when enabled.
+
+theme_judge:
+  min_core_score: 7.5 # Minimum LLM theme score for core recommendations.
+  min_peripheral_score: 6.5 # Minimum LLM theme score for peripheral-but-useful recommendations.
+
 email:
   sender: ??? # The email account of the SMTP server that sends you email. Example: abc@qq.com
   receiver: ??? # The email account that receives the paper list. Example: abc@outlook.com

@@ -1,8 +1,11 @@
-"""Tests for zotero_arxiv_daily.protocol: Paper.generate_tldr, Paper.generate_affiliations."""
+"""Tests for zotero_arxiv_daily.protocol: Paper LLM helpers."""
+
+from types import SimpleNamespace
 
 import pytest
 
 from tests.canned_responses import make_sample_paper, make_stub_openai_client
+from zotero_arxiv_daily.protocol import RelatedPaper
 
 
 @pytest.fixture()
@@ -122,3 +125,116 @@ def test_affiliations_error_returns_none(llm_params):
     result = paper.generate_affiliations(broken_client, llm_params)
     assert result is None
     assert paper.affiliations is None
+
+
+# ---------------------------------------------------------------------------
+# generate_theme_review
+# ---------------------------------------------------------------------------
+
+
+def test_theme_review_parses_topic_profile_fields(llm_params):
+    captured = {}
+
+    def create_theme_review(**kwargs):
+        captured["messages"] = kwargs["messages"]
+        return SimpleNamespace(
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(
+                        content=(
+                            '{"matched_topic_id": "protein_engineering", '
+                            '"theme_score": 8.2, '
+                            '"object_match": 9, '
+                            '"method_match": 8, '
+                            '"question_match": 8, '
+                            '"context_match": 7, '
+                            '"novelty_score": 6, '
+                            '"boundary_violation": false, '
+                            '"decision": "keep", '
+                            '"lane": "core", '
+                            '"reason": "Directly studies protein sequence optimization."}'
+                        ),
+                    ),
+                )
+            ]
+        )
+
+    client = SimpleNamespace(
+        chat=SimpleNamespace(
+            completions=SimpleNamespace(create=create_theme_review),
+        )
+    )
+    topic_profile = SimpleNamespace(
+        to_text=lambda: (
+            "ID: protein_engineering\n"
+            "Name: Protein engineering\n"
+            "Negative boundaries: oncology drug-combination optimization"
+        )
+    )
+    paper = make_sample_paper(
+        title="Protein sequence optimization",
+        abstract="We optimize protein sequences with a generative model.",
+        related_papers=[
+            RelatedPaper(
+                title="Directed evolution in embedding space",
+                score=8.5,
+                abstract="A protein engineering study.",
+            )
+        ],
+    )
+    paper.matched_topic = SimpleNamespace(
+        topic_id="protein_engineering",
+        topic_name="Protein engineering",
+        score=8.7,
+        profile=topic_profile,
+    )
+
+    result = paper.generate_theme_review(client, llm_params)
+
+    assert result.matched_topic_id == "protein_engineering"
+    assert result.theme_score == pytest.approx(8.2)
+    assert result.keep is True
+    assert result.lane == "core"
+    assert result.object_match == pytest.approx(9)
+    assert result.method_match == pytest.approx(8)
+    assert result.question_match == pytest.approx(8)
+    assert result.context_match == pytest.approx(7)
+    assert result.novelty_score == pytest.approx(6)
+    assert result.boundary_violation is False
+    assert result.reason == "Directly studies protein sequence optimization."
+
+    prompt = str(captured["messages"])
+    assert "Matched topic profile" in prompt
+    assert "Negative boundaries: oncology drug-combination optimization" in prompt
+
+
+def test_theme_review_defaults_topic_id_from_matched_topic(llm_params):
+    def create_theme_review(**kwargs):
+        return SimpleNamespace(
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(
+                        content='{"theme_score": 7.1, "decision": "keep", "lane": "peripheral", "reason": "Useful method."}',
+                    ),
+                )
+            ]
+        )
+
+    client = SimpleNamespace(
+        chat=SimpleNamespace(
+            completions=SimpleNamespace(create=create_theme_review),
+        )
+    )
+    paper = make_sample_paper()
+    paper.matched_topic = SimpleNamespace(
+        topic_id="protein_engineering",
+        topic_name="Protein engineering",
+        score=7.2,
+        profile=SimpleNamespace(to_text=lambda: "Protein engineering topic profile"),
+    )
+
+    result = paper.generate_theme_review(client, llm_params)
+
+    assert result.matched_topic_id == "protein_engineering"
+    assert result.lane == "peripheral"
+    assert result.keep is True

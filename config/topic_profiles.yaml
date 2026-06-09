@@ -1,0 +1,29 @@
+topics:
+  - id: protein_engineering
+    name: Protein engineering and generative protein design
+    description: Design, optimization, and evaluation of protein sequences, protein structures, or engineered protein functions.
+    core_objects:
+      - protein sequence
+      - protein structure
+      - DNA-binding protein
+      - chimeric antigen receptor
+      - engineered enzyme
+    methods:
+      - directed evolution
+      - Bayesian optimization
+      - generative models
+      - protein language models
+      - sequence-function modeling
+    research_questions:
+      - optimize protein function
+      - design functional proteins
+      - model sequence-function relationships
+      - evaluate engineered proteins experimentally or computationally
+    positive_examples:
+      - Directed Evolution of Proteins via Bayesian Optimization in Embedding Space
+      - Generative design of sequence specific DNA binding proteins
+    negative_boundaries:
+      - generic oncology drug-combination optimization
+      - clinical treatment scheduling
+      - AI drug-screening workflows without protein design
+      - general cell biology without engineered protein function

@@ -88,17 +88,58 @@ def get_related_papers_html(paper:Paper) -> str:
     return "; ".join(items)
 
 
-def get_theme_review_html(paper:Paper) -> str:
-    if paper.theme_review is None:
+def _format_score(value) -> str:
+    try:
+        return f"{float(value):.1f}/10"
+    except (TypeError, ValueError):
+        return text_to_html(value)
+
+
+def get_matched_topic_html(paper:Paper) -> str:
+    matched_topic = getattr(paper, "matched_topic", None)
+    if matched_topic is None:
         return ""
-    decision = "keep" if paper.theme_review.keep else "drop"
+    topic_id = getattr(matched_topic, "topic_id", None)
+    topic_name = getattr(matched_topic, "topic_name", None)
+    score = getattr(matched_topic, "score", None)
+    if topic_id is None or topic_name is None or score is None:
+        return ""
     return (
-        f"<br><strong>Theme match:</strong> {paper.theme_review.theme_score:.1f}/10 ({decision})"
-        f"<br><strong>Theme reason:</strong> {text_to_html(paper.theme_review.reason)}"
+        f"<br><strong>Matched topic:</strong> {text_to_html(topic_name)} "
+        f"({text_to_html(topic_id)}, {_format_score(score)})"
     )
 
 
-def get_block_html(title:str, authors:str, rate:str, tldr:str, pdf_url:str, affiliations:str=None, source:str=None, related_papers:str=None, theme_review:str=None):
+def get_theme_review_html(paper:Paper) -> str:
+    if paper.theme_review is None:
+        return ""
+    review = paper.theme_review
+    decision = "keep" if review.keep else "drop"
+    details = []
+    lane = getattr(review, "lane", None)
+    if lane is not None:
+        details.append(f"<br><strong>Lane:</strong> {text_to_html(lane)}")
+    for attr, label in (
+        ("object_match", "Object match"),
+        ("method_match", "Method match"),
+        ("question_match", "Question match"),
+        ("context_match", "Context match"),
+    ):
+        value = getattr(review, attr, None)
+        if value is not None:
+            details.append(f"<br><strong>{label}:</strong> {_format_score(value)}")
+    boundary_violation = getattr(review, "boundary_violation", None)
+    if boundary_violation is not None:
+        boundary_text = "Yes" if boundary_violation else "No"
+        details.append(f"<br><strong>Boundary violation:</strong> {boundary_text}")
+    return (
+        f"<br><strong>Theme match:</strong> {review.theme_score:.1f}/10 ({decision})"
+        f"{''.join(details)}"
+        f"<br><strong>Theme reason:</strong> {text_to_html(review.reason)}"
+    )
+
+
+def get_block_html(title:str, authors:str, rate:str, tldr:str, pdf_url:str, affiliations:str=None, source:str=None, related_papers:str=None, theme_review:str=None, matched_topic:str=None):
     block_template = """
     <table border="0" cellpadding="0" cellspacing="0" width="100%" style="font-family: Arial, sans-serif; border: 1px solid #ddd; border-radius: 8px; padding: 16px; background-color: #f9f9f9;">
     <tr>
@@ -117,6 +158,7 @@ def get_block_html(title:str, authors:str, rate:str, tldr:str, pdf_url:str, affi
         <td style="font-size: 14px; color: #333; padding: 8px 0;">
             <strong>Source:</strong> {source}<br>
             <strong>Relevance:</strong> {rate}
+            {matched_topic}
             <br>
             <strong>Recommended because:</strong> closest to Zotero papers: {related_papers}
             {theme_review}
@@ -145,6 +187,7 @@ def get_block_html(title:str, authors:str, rate:str, tldr:str, pdf_url:str, affi
         source=text_to_html(source or "Unknown"),
         related_papers=related_papers or "No close Zotero match recorded",
         theme_review=theme_review or "",
+        matched_topic=matched_topic or "",
     )
 
 def get_stars(score:float):
@@ -191,7 +234,8 @@ def render_email(papers:list[Paper], daily_overview:str | None=None) -> str:
             affiliations = 'Unknown Affiliation'
         related_papers = get_related_papers_html(p)
         theme_review = get_theme_review_html(p)
-        parts.append(get_block_html(p.title, authors, rate, p.tldr, p.pdf_url, affiliations, p.source, related_papers, theme_review))
+        matched_topic = get_matched_topic_html(p)
+        parts.append(get_block_html(p.title, authors, rate, p.tldr, p.pdf_url, affiliations, p.source, related_papers, theme_review, matched_topic))
 
     content = '<br>' + '</br><br>'.join(parts) + '</br>'
     return framework.replace('__CONTENT__', content)

@@ -1,5 +1,7 @@
 """Tests for zotero_arxiv_daily.construct_email: render_email, get_stars, get_block_html."""
 
+from types import SimpleNamespace
+
 from zotero_arxiv_daily.construct_email import render_email, get_stars, get_block_html, get_empty_html
 from zotero_arxiv_daily.protocol import RelatedPaper, ThemeReview
 from tests.canned_responses import make_sample_paper
@@ -27,6 +29,55 @@ def test_render_email_with_daily_overview_and_related_papers():
     assert "Recommended because" in html
     assert "Theme match" in html
     assert "Same protein-design theme." in html
+
+
+def test_render_email_shows_matched_topic():
+    paper = make_sample_paper(score=7.5, tldr="A great paper.")
+    paper.matched_topic = SimpleNamespace(
+        topic_id="protein_engineering",
+        topic_name="Protein engineering",
+        score=8.7,
+    )
+
+    html = render_email([paper])
+
+    assert "Matched topic" in html
+    assert "Protein engineering" in html
+    assert "protein_engineering" in html
+    assert "8.7" in html
+
+
+def test_render_email_shows_detailed_theme_review_scores():
+    paper = make_sample_paper(
+        score=7.5,
+        tldr="A great paper.",
+        theme_review=SimpleNamespace(
+            theme_score=8.4,
+            keep=True,
+            lane="direct",
+            reason="Strong protein-engineering evidence.",
+            object_match=9,
+            method_match=7,
+            question_match=8,
+            context_match=6,
+            boundary_violation=False,
+        ),
+    )
+
+    html = render_email([paper])
+
+    assert "Lane" in html
+    assert "direct" in html
+    assert "Object match" in html
+    assert "9.0/10" in html
+    assert "Method match" in html
+    assert "7.0/10" in html
+    assert "Question match" in html
+    assert "8.0/10" in html
+    assert "Context match" in html
+    assert "6.0/10" in html
+    assert "Boundary violation" in html
+    assert "No" in html
 
 
 def test_render_email_empty_list():

@@ -1,6 +1,7 @@
 """Tests for zotero_arxiv_daily.executor: normalize_path_patterns, filter_corpus, fetch_zotero_corpus, E2E."""
 
 from datetime import datetime
+from types import SimpleNamespace
 
 import pytest
 from omegaconf import OmegaConf
@@ -130,6 +131,54 @@ def test_filter_by_relevance_score_disabled_returns_all():
     assert filtered == papers
 
 
+def test_filter_by_theme_review_uses_lane_specific_thresholds():
+    from tests.canned_responses import make_sample_paper
+
+    executor = Executor.__new__(Executor)
+    executor.config = OmegaConf.create(
+        {
+            "executor": {
+                "min_theme_score": 7.5,
+                "theme_judge_keep_on_failure": False,
+            },
+            "theme_judge": {
+                "min_core_score": 7.5,
+                "min_peripheral_score": 6.5,
+            },
+        }
+    )
+    papers = [
+        make_sample_paper(
+            title="Core keep",
+            theme_review=SimpleNamespace(theme_score=7.6, keep=True, lane="core"),
+        ),
+        make_sample_paper(
+            title="Core too low",
+            theme_review=SimpleNamespace(theme_score=7.4, keep=True, lane="core"),
+        ),
+        make_sample_paper(
+            title="Peripheral keep",
+            theme_review=SimpleNamespace(theme_score=6.7, keep=True, lane="peripheral"),
+        ),
+        make_sample_paper(
+            title="Peripheral too low",
+            theme_review=SimpleNamespace(theme_score=6.4, keep=True, lane="peripheral"),
+        ),
+        make_sample_paper(
+            title="Boundary drop",
+            theme_review=SimpleNamespace(theme_score=9.0, keep=True, lane="core", boundary_violation=True),
+        ),
+        make_sample_paper(
+            title="Decision drop",
+            theme_review=SimpleNamespace(theme_score=9.0, keep=False, lane="drop"),
+        ),
+    ]
+
+    filtered = executor.filter_by_theme_review(papers)
+
+    assert [p.title for p in filtered] == ["Core keep", "Peripheral keep"]
+
+
 # ---------------------------------------------------------------------------
 # fetch_zotero_corpus
 # ---------------------------------------------------------------------------
@@ -238,6 +287,112 @@ def test_run_end_to_end(config, monkeypatch):
     assert len(sent) == 1, "Email should have been sent"
     _, _, email_body = sent[0]
     assert "text/html" in email_body
+
+
+def test_run_matches_topic_profiles_before_theme_review(config, monkeypatch):
+    """Executor should attach topic evidence before calling Paper.generate_theme_review."""
+    import smtplib
+
+    from omegaconf import open_dict
+
+    from tests.canned_responses import (
+        make_sample_paper,
+        make_stub_openai_client,
+        make_stub_smtp,
+        make_stub_zotero_client,
+    )
+
+    with open_dict(config):
+        config.executor.source = ["arxiv"]
+        config.executor.reranker = "api"
+        config.executor.send_empty = False
+        config.executor.theme_judge = True
+        config.executor.theme_judge_paper_num = 2
+        config.executor.daily_overview = False
+        config.executor.min_relevance_score = None
+        config.topic_profiles.enabled = True
+        config.topic_profiles.auto_generate = True
+
+    stub_zot = make_stub_zotero_client()
+    monkeypatch.setattr("zotero_arxiv_daily.executor.zotero.Zotero", lambda *a, **kw: stub_zot)
+
+    stub_client = make_stub_openai_client()
+    monkeypatch.setattr("zotero_arxiv_daily.executor.OpenAI", lambda **kw: stub_client)
+    monkeypatch.setattr("zotero_arxiv_daily.reranker.api.OpenAI", lambda **kw: stub_client)
+
+    retrieved = [make_sample_paper(title="Topic Candidate", score=None)]
+
+    import zotero_arxiv_daily.retriever.arxiv_retriever  # noqa: F401
+
+    from zotero_arxiv_daily.retriever.base import registered_retrievers
+
+    monkeypatch.setattr(
+        registered_retrievers["arxiv"],
+        "retrieve_papers",
+        lambda self: retrieved,
+    )
+
+    topic_profile = SimpleNamespace(
+        id="protein_engineering",
+        name="Protein engineering",
+        to_text=lambda: "Protein engineering topic profile",
+    )
+    calls = {"matched": False, "judged_topic_ids": []}
+
+    def fake_generate_topic_profiles(corpus, openai_client, llm_params, cfg):
+        assert len(corpus) == 2
+        return [topic_profile]
+
+    monkeypatch.setattr(
+        "zotero_arxiv_daily.executor.generate_topic_profiles_from_corpus",
+        fake_generate_topic_profiles,
+        raising=False,
+    )
+
+    def fake_match_papers_to_topics(papers, topic_profiles, reranker, top_n=3):
+        calls["matched"] = True
+        assert topic_profiles == [topic_profile]
+        for paper in papers:
+            paper.matched_topic = SimpleNamespace(
+                topic_id="protein_engineering",
+                topic_name="Protein engineering",
+                score=8.8,
+                profile=topic_profile,
+            )
+        return papers
+
+    monkeypatch.setattr(
+        "zotero_arxiv_daily.executor.match_papers_to_topics",
+        fake_match_papers_to_topics,
+        raising=False,
+    )
+
+    def fake_generate_theme_review(self, openai_client, llm_params):
+        calls["judged_topic_ids"].append(self.matched_topic.topic_id)
+        self.theme_review = SimpleNamespace(
+            theme_score=8.0,
+            keep=True,
+            lane="core",
+            reason="Matches the explicit topic.",
+            boundary_violation=False,
+        )
+        return self.theme_review
+
+    monkeypatch.setattr(
+        "zotero_arxiv_daily.protocol.Paper.generate_theme_review",
+        fake_generate_theme_review,
+    )
+
+    sent = []
+    monkeypatch.setattr(smtplib, "SMTP", make_stub_smtp(sent))
+    monkeypatch.setattr("zotero_arxiv_daily.retriever.base.sleep", lambda _: None)
+
+    executor = Executor(config)
+    executor.run()
+
+    assert calls["matched"] is True
+    assert calls["judged_topic_ids"] == ["protein_engineering"]
+    assert len(sent) == 1
 
 
 def test_run_no_papers_send_empty_false(config, monkeypatch):

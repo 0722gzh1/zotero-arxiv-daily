@@ -4,6 +4,8 @@ from omegaconf import DictConfig, ListConfig
 from .utils import glob_match
 from .retriever import get_retriever_cls
 from .protocol import CorpusPaper, generate_daily_overview
+from .topic_matcher import match_papers_to_topics
+from .topic_profiles import generate_topic_profiles_from_corpus, load_topic_profiles
 import random
 from datetime import datetime
 from .reranker import get_reranker_cls
@@ -38,6 +40,12 @@ class Executor:
             source: get_retriever_cls(source)(config) for source in config.executor.source
         }
         self.reranker = get_reranker_cls(config.executor.reranker)(config)
+        topic_profiles_config = config.get("topic_profiles", {}) or {}
+        if topic_profiles_config.get("enabled", False) and not topic_profiles_config.get("auto_generate", False):
+            self.manual_topic_profiles = load_topic_profiles(config)
+        else:
+            self.manual_topic_profiles = []
+        self.topic_profiles = []
         self.openai_client = OpenAI(api_key=config.llm.api.key, base_url=config.llm.api.base_url)
     def fetch_zotero_corpus(self) -> list[CorpusPaper]:
         logger.info("Fetching zotero corpus")
@@ -99,7 +107,12 @@ class Executor:
         return filtered
 
     def filter_by_theme_review(self, papers):
-        min_theme_score = self.config.executor.get("min_theme_score", 7.0)
+        theme_judge_config = self.config.get("theme_judge", {}) or {}
+        min_core_score = theme_judge_config.get(
+            "min_core_score",
+            self.config.executor.get("min_theme_score", 7.0),
+        )
+        min_peripheral_score = theme_judge_config.get("min_peripheral_score", min_core_score)
         keep_on_failure = self.config.executor.get("theme_judge_keep_on_failure", False)
         filtered = []
         for paper in papers:
@@ -107,10 +120,34 @@ class Executor:
                 if keep_on_failure:
                     filtered.append(paper)
                 continue
-            if paper.theme_review.keep and paper.theme_review.theme_score >= min_theme_score:
+            if getattr(paper.theme_review, "boundary_violation", False):
+                continue
+            lane = getattr(paper.theme_review, "lane", "core")
+            threshold = min_peripheral_score if lane == "peripheral" else min_core_score
+            if paper.theme_review.keep and paper.theme_review.theme_score >= threshold:
                 filtered.append(paper)
-        logger.info(f"Selected {len(filtered)} of {len(papers)} papers with theme score >= {min_theme_score}")
+        logger.info(
+            f"Selected {len(filtered)} of {len(papers)} papers with "
+            f"core theme score >= {min_core_score} or peripheral theme score >= {min_peripheral_score}"
+        )
         return filtered
+
+    def build_topic_profiles(self, corpus: list[CorpusPaper]):
+        topic_profiles_config = self.config.get("topic_profiles", {}) or {}
+        if not topic_profiles_config.get("enabled", False):
+            return []
+
+        if topic_profiles_config.get("auto_generate", False):
+            profiles = generate_topic_profiles_from_corpus(
+                corpus,
+                self.openai_client,
+                self.config.llm,
+                self.config,
+            )
+            if profiles:
+                return profiles
+
+        return self.manual_topic_profiles
 
     
     def run(self):
@@ -132,6 +169,7 @@ class Executor:
         reranked_papers = []
         daily_overview = None
         if len(all_papers) > 0:
+            self.topic_profiles = self.build_topic_profiles(corpus)
             logger.info("Reranking papers...")
             reranked_papers = self.reranker.rerank(all_papers, corpus)
             scores = [p.score for p in reranked_papers if p.score is not None]
@@ -139,8 +177,17 @@ class Executor:
                 logger.info(
                     f"Relevance score range: max={max(scores):.2f}, "
                     f"min={min(scores):.2f}, mean={sum(scores) / len(scores):.2f}"
-                )
+            )
             reranked_papers = self.filter_by_relevance_score(reranked_papers)
+            if self.topic_profiles:
+                top_n = int(self.config.topic_profiles.get("match_top_n", 3))
+                logger.info(f"Matching papers to {len(self.topic_profiles)} topic profiles...")
+                reranked_papers = match_papers_to_topics(
+                    reranked_papers,
+                    self.topic_profiles,
+                    self.reranker,
+                    top_n=top_n,
+                )
             if self.config.executor.get("theme_judge", True):
                 theme_judge_paper_num = self.config.executor.get("theme_judge_paper_num", 30)
                 reranked_papers = reranked_papers[:theme_judge_paper_num]

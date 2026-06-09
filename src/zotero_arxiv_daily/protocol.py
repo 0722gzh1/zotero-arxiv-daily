@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, TypeVar
+from typing import Any, Optional, TypeVar
 from datetime import datetime
 import re
 import tiktoken
@@ -20,6 +20,14 @@ class ThemeReview:
     theme_score: float
     keep: bool
     reason: str
+    matched_topic_id: Optional[str] = None
+    lane: str = "core"
+    object_match: Optional[float] = None
+    method_match: Optional[float] = None
+    question_match: Optional[float] = None
+    context_match: Optional[float] = None
+    novelty_score: Optional[float] = None
+    boundary_violation: bool = False
 
 
 @dataclass
@@ -36,6 +44,8 @@ class Paper:
     score: Optional[float] = None
     related_papers: Optional[list[RelatedPaper]] = None
     theme_review: Optional[ThemeReview] = None
+    topic_matches: Optional[list[Any]] = None
+    matched_topic: Optional[Any] = None
 
     def _generate_tldr_with_llm(self, openai_client:OpenAI,llm_params:dict) -> str:
         lang = llm_params.get('language', 'English')
@@ -122,20 +132,41 @@ class Paper:
 
     def _generate_theme_review_with_llm(self, openai_client:OpenAI,llm_params:dict) -> ThemeReview:
         lang = llm_params.get('language', 'English')
+        matched_topic = getattr(self, "matched_topic", None)
         prompt = (
-            "Judge whether the candidate paper is truly in the same research theme as the closest Zotero papers. "
+            "Judge whether the candidate paper is truly in the same research theme as the matched topic profile. "
             "Do not keep a paper just because it shares generic method words such as AI, model, optimization, embedding, "
             "Bayesian optimization, generative design, cancer, protein, or cell. The primary research object, task, "
             "biological context, and contribution must be aligned. For example, oncology drug-combination optimization "
             "and protein engineering should be considered different themes unless the candidate explicitly studies the "
             "same protein-engineering problem.\n\n"
-            "Return only a JSON object with keys: theme_score, decision, reason. "
-            "theme_score is 0 to 10. decision must be keep or drop. reason should be one concise sentence "
+            "Return only a JSON object with keys: matched_topic_id, theme_score, object_match, method_match, "
+            "question_match, context_match, novelty_score, boundary_violation, decision, lane, reason. "
+            "theme_score and match scores are 0 to 10. decision must be keep or drop. "
+            "lane must be core, peripheral, or drop. reason should be one concise sentence "
             f"in {lang}.\n\n"
             f"Candidate title: {self.title}\n"
             f"Candidate abstract: {self.abstract}\n\n"
-            "Closest Zotero papers:\n"
         )
+
+        if matched_topic is not None:
+            prompt += "Matched topic profile:\n"
+            topic_id = getattr(matched_topic, "topic_id", "")
+            topic_name = getattr(matched_topic, "topic_name", "")
+            topic_score = getattr(matched_topic, "score", None)
+            if topic_id:
+                prompt += f"Topic ID: {topic_id}\n"
+            if topic_name:
+                prompt += f"Topic name: {topic_name}\n"
+            if topic_score is not None:
+                prompt += f"Topic embedding score: {float(topic_score):.1f}\n"
+            profile = getattr(matched_topic, "profile", None)
+            if profile is not None and hasattr(profile, "to_text"):
+                prompt += f"{profile.to_text()}\n"
+            prompt += "\nRepresentative Zotero papers:\n"
+        else:
+            prompt += "Matched topic profile: None recorded.\n\nClosest Zotero papers:\n"
+
         if self.related_papers:
             for i, related in enumerate(self.related_papers[:3], start=1):
                 prompt += f"{i}. Title: {related.title}\n"
@@ -167,11 +198,21 @@ class Paper:
         data = json.loads(json_match.group(0))
         theme_score = float(data.get("theme_score", 0))
         decision = str(data.get("decision", "drop")).strip().lower()
+        matched_topic_id = data.get("matched_topic_id") or getattr(matched_topic, "topic_id", None)
+        lane = str(data.get("lane", "core" if decision == "keep" else "drop")).strip().lower()
         reason = str(data.get("reason", "")).strip()
         return ThemeReview(
             theme_score=theme_score,
-            keep=decision == "keep",
+            keep=decision == "keep" and lane != "drop",
             reason=reason,
+            matched_topic_id=str(matched_topic_id) if matched_topic_id else None,
+            lane=lane,
+            object_match=_optional_float(data.get("object_match")),
+            method_match=_optional_float(data.get("method_match")),
+            question_match=_optional_float(data.get("question_match")),
+            context_match=_optional_float(data.get("context_match")),
+            novelty_score=_optional_float(data.get("novelty_score")),
+            boundary_violation=_as_bool(data.get("boundary_violation", False)),
         )
 
     def generate_theme_review(self, openai_client:OpenAI,llm_params:dict) -> Optional[ThemeReview]:
@@ -211,8 +252,29 @@ def _generate_daily_overview_with_llm(openai_client:OpenAI,llm_params:dict,paper
         if paper.related_papers:
             matches = "; ".join(f"{match.title} ({match.score:.1f})" for match in paper.related_papers[:3])
             prompt += f"Closest Zotero matches: {matches}\n"
+        matched_topic = getattr(paper, "matched_topic", None)
+        if matched_topic is not None:
+            topic_id = getattr(matched_topic, "topic_id", "")
+            topic_name = getattr(matched_topic, "topic_name", "")
+            topic_score = getattr(matched_topic, "score", None)
+            prompt += f"Matched topic: {topic_name} ({topic_id})"
+            if topic_score is not None:
+                prompt += f", score {float(topic_score):.1f}"
+            prompt += "\n"
         if paper.theme_review:
             prompt += f"Theme score: {paper.theme_review.theme_score:.1f}\n"
+            prompt += f"Theme lane: {paper.theme_review.lane}\n"
+            detailed_scores = []
+            for label, value in [
+                ("object", paper.theme_review.object_match),
+                ("method", paper.theme_review.method_match),
+                ("question", paper.theme_review.question_match),
+                ("context", paper.theme_review.context_match),
+            ]:
+                if value is not None:
+                    detailed_scores.append(f"{label} {value:.1f}")
+            if detailed_scores:
+                prompt += f"Theme details: {', '.join(detailed_scores)}\n"
             prompt += f"Theme reason: {paper.theme_review.reason}\n"
         prompt += "\n"
 
@@ -242,3 +304,17 @@ def generate_daily_overview(openai_client:OpenAI,llm_params:dict,papers:list[Pap
     except Exception as e:
         logger.warning(f"Failed to generate daily overview: {e}")
         return None
+
+
+def _optional_float(value: Any) -> Optional[float]:
+    if value is None or value == "":
+        return None
+    return float(value)
+
+
+def _as_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes"}
+    return bool(value)
