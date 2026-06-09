@@ -1,0 +1,358 @@
+zotero:
+  user_id: ${oc.env:ZOTERO_ID} # User ID of your Zotero account.
+  api_key: ${oc.env:ZOTERO_KEY} # An Zotero API key with read access.
+  include_path: null # A list of glob patterns marking the Zotero collections that should be included. Example: ["2026/survey/**", "2026/reading-group/**"]
+
+source:
+  arxiv:
+    category: ["q-bio.BM","q-bio.CB","q-bio.QM","cs.AI"] # The categories of target arxiv papers. Find the abbr of your research area from [here](https://arxiv.org/category_taxonomy). Example: ["cs.AI","cs.CV","cs.LG","cs.CL"]
+    include_cross_list: false # Whether to include arXiv cross-list papers in subscribed categories. Example: true
+  biorxiv:
+    category: null # Ignored. bioRxiv retrieves all papers from the latest date returned by its 2-day API window.
+  medrxiv:
+    category: null # Ignored. medRxiv retrieves all papers from the latest date returned by its 2-day API window.
+
+topic_profiles:
+  enabled: true
+  auto_generate: false
+  match_top_n: 3
+  topics:
+    - id: de_novo_protein_and_biopolymer_design
+      name: "De Novo Protein and Biopolymer Design"
+      description: "Design of new proteins, enzymes, binders, assemblies, and protein-nucleic-acid complexes with experimentally testable structure-function objectives."
+      core_objects:
+        - "de novo protein scaffolds"
+        - "designed enzymes and metalloproteins"
+        - "sequence-specific DNA-binding proteins"
+        - "protein binders and miniproteins"
+        - "protein assemblies and oligomers"
+        - "GPCR and cytokine modulators"
+        - "nucleoprotein complexes"
+        - "intrinsically disordered protein ensembles"
+      methods:
+        - "RFdiffusion and diffusion-based backbone generation"
+        - "structure-conditioned sequence design"
+        - "AlphaFold-family structural screening"
+        - "motif scaffolding and active-site design"
+        - "directed evolution after computational design"
+        - "biochemical and cell-based functional assays"
+        - "crystallography, cryo-EM, and SHAPE-seq validation"
+      research_questions:
+        - "How can generated backbones be made designable, stable, and functional?"
+        - "How can protein designs achieve sequence-specific DNA or ligand recognition?"
+        - "How can catalytic activity and stereoselectivity be introduced into new scaffolds?"
+        - "How can designed assemblies control signaling, recording, or biomolecular organization?"
+        - "How should computational design models be filtered before wet-lab testing?"
+      positive_examples:
+        - "The past, present and future of de novo protein design"
+        - "De novo design of protein structure and function with RFdiffusion"
+        - "Generative design of sequence specific DNA binding proteins"
+        - "A de novo CO2 Reductase Featuring a Cysteine-Ligated Cobalt Porphyrin Cofactor"
+        - "De novo design of RNA and nucleoprotein complexes"
+        - "De novo design of GPCR exoframe modulators"
+      negative_boundaries:
+        - "generic protein structure prediction papers without a design or engineering objective"
+        - "generic ML benchmark papers without protein, RNA, DNA, or biomolecular design"
+        - "small-molecule drug discovery papers without designed protein or biopolymer components"
+        - "clinical immunotherapy papers without de novo designed binders or receptors"
+        - "database papers that only catalog sequences without design, generation, or functional engineering"
+        - "molecular dynamics papers focused only on natural protein motion without design implications"
+
+    - id: precision_base_prime_and_mitochondrial_editing
+      name: "Precision Base, Prime, and Mitochondrial Genome Editing"
+      description: "Engineering and mechanistic study of CRISPR, deaminase, TALE-linked, transposon, base-editor, and prime-editor systems for precise nuclear or mitochondrial genome modification."
+      core_objects:
+        - "cytosine base editors"
+        - "adenine base editors"
+        - "mitochondrial DNA editors"
+        - "TALE-linked deaminases"
+        - "Cas9, Cas12, Cas10, and IscB editors"
+        - "pegRNA-guided prime editors"
+        - "deaminase domains and TadA variants"
+        - "off-target DNA and RNA editing outcomes"
+      methods:
+        - "structure-guided editor engineering"
+        - "AlphaFold-guided mutation scanning"
+        - "CRISPRi screens and target-library analysis"
+        - "machine-learning-guided variant selection"
+        - "split or compact editor architecture design"
+        - "deep sequencing of editing outcomes"
+        - "cryo-EM and biochemical mechanism analysis"
+      research_questions:
+        - "How can base editors increase efficiency while reducing bystander and off-target edits?"
+        - "Which structural features control deaminase substrate scope and editor precision?"
+        - "How can compact editors be optimized for delivery-constrained applications?"
+        - "How can mitochondrial DNA editing be made precise and therapeutically useful?"
+        - "What cellular determinants shape prime-editing and base-editing outcomes?"
+      positive_examples:
+        - "Computational design of a high-precision mitochondrial DNA cytosine base editor"
+        - "Structural insights into DdCBE in action enable high-precision mitochondrial DNA editing"
+        - "Engineering Compact Base Editors by AlphaFold-Guided Mutation Scan and Escherichia coli-Based Tri-Selection"
+        - "AI-guided Cas9 engineering provides an effective strategy to enhance base editing"
+        - "Structural basis for pegRNA-guided reverse transcription by a prime editor"
+        - "Search-and-replace genome editing without double-strand breaks or donor DNA"
+      negative_boundaries:
+        - "general CRISPR biology papers without editor engineering or precise editing outcomes"
+        - "gene therapy delivery papers without base, prime, mitochondrial, or programmable editing"
+        - "epigenetic methylation studies without a genome-editing tool or deaminase mechanism"
+        - "protein design papers where the designed protein is not an editor or editing component"
+        - "RNA editing papers without programmable editor engineering or measurable editing specificity"
+        - "clinical genetics papers that mention variants but do not test editing-based correction"
+
+    - id: plm_guided_protein_engineering_and_directed_evolution
+      name: "PLM-Guided Protein Engineering and Directed Evolution"
+      description: "Use of protein language models, fitness landscapes, mutational effect prediction, and ML-assisted evolution to optimize protein function, stability, activity, and diversity."
+      core_objects:
+        - "protein language models"
+        - "fitness landscapes"
+        - "mutational effect predictors"
+        - "combinatorial protein variant libraries"
+        - "enzyme engineering targets"
+        - "thermostability and activity tradeoffs"
+        - "epistatic mutation combinations"
+        - "sequence-function datasets"
+      methods:
+        - "zero-shot mutation effect prediction"
+        - "few-shot learning with wet-lab data"
+        - "retrieval-augmented autoregressive modeling"
+        - "epistasis-aware variant ranking"
+        - "ML-guided directed evolution"
+        - "combinatorial library optimization"
+        - "sequence-activity display assays"
+        - "biophysical pretraining and transfer learning"
+      research_questions:
+        - "How well can PLMs predict useful mutations without large labeled datasets?"
+        - "How can epistasis be modeled to design higher-order protein variants?"
+        - "How should fitness, stability, activity, and diversity be co-optimized?"
+        - "What experimental data are most informative for rapid directed evolution?"
+        - "How can ML-guided evolution reduce screening burden while preserving discoverability?"
+      positive_examples:
+        - "Protein Design by Directed Evolution Guided by Large Language Models"
+        - "Rapid directed evolution guided by protein language models and epistatic interactions"
+        - "Tranception: protein fitness prediction with autoregressive transformers and inference-time retrieval"
+        - "Zero-shot prediction of mutation effects with multimodal deep representation learning guides protein engineering"
+        - "Machine learning-guided co-optimization of fitness and diversity facilitates combinatorial library design in enzyme engineering"
+        - "CombinGym: a benchmark platform for machine learning-assisted design of combinatorial protein variants"
+      negative_boundaries:
+        - "generic large language model papers without protein sequences, variants, or fitness data"
+        - "protein structure prediction papers without mutation ranking or engineering decisions"
+        - "directed evolution studies without computational or ML-guided variant prioritization"
+        - "general enzyme mechanism papers without variant optimization or fitness landscapes"
+        - "benchmark-only ML papers without realistic protein engineering tasks or wet-lab relevance"
+        - "genomic language model papers focused only on noncoding DNA regulation"
+
+    - id: nucleic_acid_base_flipping_and_repair_dynamics
+      name: "Nucleic Acid Base Flipping and Repair Dynamics"
+      description: "Mechanistic and simulation-centered study of DNA and RNA base flipping, lesion recognition, repair enzymes, and protein-induced nucleic-acid deformation."
+      core_objects:
+        - "flipped DNA and RNA bases"
+        - "uracil DNA glycosylase"
+        - "AlkD, AlkB, and ABH2 repair enzymes"
+        - "8-oxoguanine and bulky DNA lesions"
+        - "Rad4/XPC nucleotide excision repair complexes"
+        - "DNA deformability and base-pair opening"
+        - "reaction coordinates for base flipping"
+        - "repair-enzyme DNA complexes"
+      methods:
+        - "all-atom molecular dynamics simulation"
+        - "enhanced sampling and free-energy calculations"
+        - "reaction-coordinate design"
+        - "structural analysis of enzyme-DNA complexes"
+        - "binding kinetics and lesion recognition assays"
+        - "molecular interaction plotting"
+        - "thermodynamic pathway reconstruction"
+      research_questions:
+        - "What reaction coordinates best capture DNA or RNA base flipping?"
+        - "How do repair enzymes recognize damaged bases before full extrusion?"
+        - "How do protein-DNA contacts reshape local deformability and lesion accessibility?"
+        - "What energetic barriers distinguish spontaneous base opening from enzyme-assisted flipping?"
+        - "How do repair pathways differ across uracil, alkylated, and oxidized lesions?"
+      positive_examples:
+        - "The base flipping of A-DNA-a molecular dynamic simulation study"
+        - "Reaction Coordinate and Thermodynamics of Base Flipping in RNA"
+        - "An Improved Reaction Coordinate for Nucleic Acid Base Flipping Studies"
+        - "Kinetic Mechanism of Damage Site Recognition and Uracil Flipping by Escherichia coli Uracil DNA Glycosylase"
+        - "Free Energy Landscape of Lesion Recognition by Human 8-Oxoguanine DNA N-Glycosylase 1: Mechanistic Insights into Detection and Processing of 8-Oxoguanine in DNA"
+        - "The very moment when UDG recognizes a flipped-out uracil base in dsDNA"
+      negative_boundaries:
+        - "genome editing papers that do not analyze base-flipping or repair-enzyme dynamics"
+        - "generic molecular dynamics method papers without DNA or RNA base extrusion"
+        - "DNA repair reviews without structural, kinetic, or simulation-level mechanism"
+        - "epigenetic methylation papers without nucleotide flipping or lesion recognition"
+        - "RNA design papers focused on tertiary folding rather than base-flipping thermodynamics"
+        - "protein-only conformational dynamics papers without nucleic-acid substrates"
+
+    - id: cardiac_mitochondrial_disease_and_genome_therapy
+      name: "Cardiac Mitochondrial Disease and Genome Therapy"
+      description: "Mechanisms and therapeutic correction of genetic cardiomyopathies, cardiac mitochondrial dysfunction, hypertrophic remodeling, and inherited arrhythmia models."
+      core_objects:
+        - "hypertrophic and restrictive cardiomyopathy"
+        - "mitochondrial cardiomyopathies"
+        - "MYBPC3, Scn5a, FARS2, COX15, and desmin disease models"
+        - "cardiac energetics and oxidative respiration"
+        - "sarcomere-mitochondrial communication"
+        - "pathological cardiac hypertrophy"
+        - "AAV9 and mRNA cardiac therapies"
+        - "in vivo cardiac base editing"
+      methods:
+        - "mouse cardiomyopathy models"
+        - "in vivo genome and base editing"
+        - "AAV9-mediated gene therapy"
+        - "modified mRNA treatment"
+        - "mitochondrial respiration and energetics assays"
+        - "human genetics and disease-variant analysis"
+        - "inflammation and cGAS-STING signaling assays"
+      research_questions:
+        - "Which genetic lesions and mitochondrial pathways drive cardiomyopathy progression?"
+        - "Can in vivo editing or gene therapy prevent or reverse inherited cardiac disease?"
+        - "How does mitochondrial dysfunction interact with sarcomere defects and inflammation?"
+        - "Which delivery and expression strategies improve cardiac therapeutic durability?"
+        - "How can disease models connect molecular rescue to cardiac function and survival?"
+      positive_examples:
+        - "Therapeutic base editing alleviates restrictive cardiomyopathy"
+        - "Efficient in vivo genome editing prevents hypertrophic cardiomyopathy in mice"
+        - "AAV9-mediated MYBPC3 gene therapy with optimized expression cassette enhances cardiac function and survival in MYBPC3 cardiomyopathy models"
+        - "Altered Cardiac Energetics and Mitochondrial Dysfunction in Hypertrophic Cardiomyopathy"
+        - "FARS2 Deficiency Causes Cardiomyopathy by Disrupting Mitochondrial Homeostasis and the Mitochondrial Quality Control System"
+        - "Mitochondrial cardiomyopathies: pathogenesis, diagnosis, and treatment"
+      negative_boundaries:
+        - "general cardiovascular clinical studies without genetic, mitochondrial, or therapeutic mechanism"
+        - "base editor engineering papers without cardiac disease models or cardiovascular targets"
+        - "mitochondrial metabolism papers outside cardiac, skeletal muscle, or inherited disease contexts"
+        - "oncology or CAR-T papers without cardiomyopathy or cardiac mitochondrial relevance"
+        - "aging or NAD metabolism papers without a direct cardiac disease endpoint"
+        - "generic AAV delivery papers without cardiomyopathy, arrhythmia, or cardiac functional rescue"
+
+    - id: rna_structure_function_and_design
+      name: "RNA Structure, Function, and Design"
+      description: "Prediction, generation, and engineering of RNA tertiary structures, RNA motifs, circular RNAs, guide RNAs, and RNA or nucleoprotein functional assemblies."
+      core_objects:
+        - "3D RNA backbones"
+        - "RNA tertiary motifs and modules"
+        - "RNA inverse-folding targets"
+        - "circular RNAs and circRNA degradation"
+        - "engineered guide RNAs"
+        - "RNA multivalent assemblies"
+        - "RNA-protein and nucleoprotein complexes"
+        - "functional RNA evolutionary constraints"
+      methods:
+        - "flow matching for RNA backbone generation"
+        - "probabilistic grammars for RNA folding"
+        - "covariation and evolutionary information"
+        - "genomic foundation model scoring"
+        - "inverse folding with structural constraints"
+        - "cryo-EM of RNA assemblies"
+        - "deep learning tertiary structure prediction"
+        - "chemical probing and functional validation"
+      research_questions:
+        - "How can RNA sequences be designed to preserve both structure and in vivo function?"
+        - "How should generative models represent flexible RNA backbones and nucleobases?"
+        - "What evolutionary signals improve RNA tertiary motif and secondary-structure prediction?"
+        - "How do circular RNA stability, degradation, and guide-RNA engineering affect function?"
+        - "How can RNA-only or RNA-protein assemblies be designed and experimentally validated?"
+      positive_examples:
+        - "RNA-FrameFlow: Flow Matching for de novo 3D RNA Backbone Design"
+        - "Capturing Natural Evolution in Function-guided RNA Design via Genomic Foundation Models"
+        - "NuFold: end-to-end approach for RNA tertiary structure prediction with flexible nucleobase center representation"
+        - "All-at-once RNA folding with 3D motif prediction framed by evolutionary information"
+        - "De novo design of RNA and nucleoprotein complexes"
+        - "Engineered circular guide RNAs enhance miniature CRISPR/Cas12f-based gene activation and adenine base editing"
+      negative_boundaries:
+        - "generic transcriptomics papers without RNA structure, folding, design, or engineered function"
+        - "protein-only design papers without RNA or nucleoprotein components"
+        - "CRISPR editing papers where guide RNA is not engineered or structurally analyzed"
+        - "circRNA cataloging papers without degradation mechanism, structure, or functional engineering"
+        - "RNA-seq method papers without tertiary structure or design relevance"
+        - "nucleic-acid MD papers focused on base flipping rather than RNA architecture or design"
+
+    - id: biomolecular_databases_structure_prediction_and_mining
+      name: "Biomolecular Databases, Structure Prediction, and Mining"
+      description: "Large-scale computational resources and search methods for mining protein, viral, bacterial, genomic, and conformational diversity for structure-function discovery."
+      core_objects:
+        - "large protein sequence databases"
+        - "predicted protein structure databases"
+        - "bacterial and viral genome collections"
+        - "homology and structural motif search indexes"
+        - "protein family and immune-system repertoires"
+        - "macromolecular conformational dynamics repositories"
+        - "protein embeddings and sequence diversity atlases"
+      methods:
+        - "GPU-accelerated MSA and homology search"
+        - "AlphaFold-family structure prediction at scale"
+        - "metagenomic and pangenomic mining"
+        - "protein and genomic language-model annotation"
+        - "structural motif search and alignment statistics"
+        - "embedding-based evolution analysis"
+        - "database construction and benchmark curation"
+      research_questions:
+        - "How can massive sequence and structure resources reveal new protein functions?"
+        - "How can search and alignment methods scale to modern protein and genome databases?"
+        - "Which database designs make structural, evolutionary, and functional diversity usable?"
+        - "How can language models help discover bacterial immunity systems or enzyme families?"
+        - "How should predicted structures and dynamics repositories support downstream design?"
+      positive_examples:
+        - "AlphaFast: High-throughput AlphaFold 3 via GPU-accelerated MSA construction"
+        - "GPU-accelerated homology search with MMseqs2"
+        - "AllTheBacteria - all bacterial genomes assembled, available, and searchable"
+        - "The Viral AlphaFold Database of monomers and homodimers reveals conserved protein folds in viruses of bacteria, archaea, and eukaryotes"
+        - "DynaRepo: The repository of macromolecular conformational dynamics"
+        - "Large protein databases reveal structural complementarity and functional locality"
+      negative_boundaries:
+        - "generic database papers without protein, genome, structure, or biomolecular function content"
+        - "single-protein structure studies without scalable search, mining, or resource construction"
+        - "ML infrastructure papers without biological sequence or structure data"
+        - "clinical cohort databases without molecular sequence, structure, or functional mining"
+        - "protein design papers that do not use or produce large-scale searchable resources"
+        - "web-tool announcements without substantive database scale, curation, or biological discovery"
+
+theme_judge:
+  min_core_score: 7.5 # Strict threshold for directly in-scope papers.
+  min_peripheral_score: 6.5 # Lower threshold for peripheral but potentially useful papers.
+
+email:
+  sender: ${oc.env:SENDER} # The email account of the SMTP server that sends you email. Example: abc@qq.com
+  receiver: ${oc.env:RECEIVER} # The email account that receives the paper list. Example: abc@outlook.com
+  smtp_server: smtp.qq.com # The SMTP server that sends the email. Ask your email provider (Gmail, QQ, Outlook, ...) for its SMTP server. Example: smtp.qq.com
+  smtp_port: 465 # The port of SMTP server. Example: 465
+  sender_password: ${oc.env:SENDER_PASSWORD} # The password of the sender account. Note that it's not necessarily the password for logging in the e-mail client, but the authentication code for SMTP service. Ask your email provider for this. Example: abcdefghijklmn
+
+llm:
+  api:
+    key: ${oc.env:OPENAI_API_KEY}
+    base_url: ${oc.env:OPENAI_API_BASE}
+  generation_kwargs:
+    model: THUDM/GLM-Z1-9B-0414
+    max_tokens: 4096
+  language: English # Preferred language for the TL;DR. Example: English
+
+reranker:
+  relevance:
+    top_k: 10 # Score each candidate by its closest Zotero papers instead of averaging over the entire library.
+    match_count: 3 # Number of closest Zotero papers shown as recommendation evidence in the email.
+    best_similarity_weight: 0.0 # Blend in the single best Zotero match. Must be between 0 and 1.
+    time_decay_strength: 0.15 # Lightly prefer Zotero papers added recently. Set 0 to disable.
+  local:
+    model: jinaai/jina-embeddings-v5-text-nano-retrieval # The Hugging Face model name of the local embedding model. Example: jinaai/jina-embeddings-v5-text-nano
+    encode_kwargs:
+    # The kwargs for the encode method of the local embedding model. Details see [here](https://www.sbert.net/docs/package_reference/SentenceTransformer.html#sentence_transformers.SentenceTransformer.encode)
+      task: retrieval
+      prompt_name: document
+  api:
+    key: ${oc.env:OPENAI_API_KEY} # API Key of your embedding model API. Example: sk-xxx
+    base_url: ${oc.env:OPENAI_API_BASE} # API URL of your embedding model API. Example: https://api.openai.com/v1
+    model: BAAI/bge-m3 # The model name of the embedding model. Example: text-embedding-3-large
+    batch_size: 32 # The batch size for embedding API requests. Adjust to match your provider's limit. Example: 64
+
+executor:
+  debug: false # Whether to use debug mode. Example: true
+  send_empty: false # Whether to send an empty email even if no new papers today. Example: true
+  max_paper_num: 100 # The maximum number of the papers presented in the email. Example: 100
+  min_relevance_score: 6.0 # Papers below this relevance score will not be sent. Adjust after checking the score range in Action logs.
+  theme_judge: true # Whether to use LLM to filter papers by true research-theme match.
+  theme_judge_paper_num: 50 # Number of top embedding-ranked papers judged by the LLM theme filter.
+  min_theme_score: 7.0 # Minimum LLM theme score required to send a paper.
+  theme_judge_keep_on_failure: false # Whether to keep a paper if LLM theme judging fails.
+  daily_overview: true # Whether to generate a daily research briefing at the top of the email.
+  overview_paper_num: 12 # Number of top-ranked papers included in the daily research briefing prompt.
+  source: ['arxiv','biorxiv','medrxiv'] # The sources of papers to retrieve. Example: ['arxiv','biorxiv','medrxiv']
+  reranker: 'api' # The reranker to use. Example: 'local' or 'api'
