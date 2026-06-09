@@ -183,6 +183,53 @@ def test_generate_topic_profiles_from_corpus_parses_llm_topics():
     assert "Protein Paper" in prompt
 
 
+def test_generate_topic_profiles_from_corpus_accepts_unescaped_control_characters():
+    from zotero_arxiv_daily.topic_profiles import generate_topic_profiles_from_corpus
+
+    def create(**kwargs):
+        return SimpleNamespace(
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(
+                        content=(
+                            '{"topics": ['
+                            '{"id": "protein_engineering", '
+                            '"name": "Protein engineering", '
+                            '"description": "Design proteins across\nmultiple lines.", '
+                            '"core_objects": ["protein sequence"], '
+                            '"methods": ["generative models"], '
+                            '"research_questions": ["optimize protein function"], '
+                            '"positive_examples": ["Protein Paper"], '
+                            '"negative_boundaries": ["generic oncology optimization"]}'
+                            "]}",
+                        ),
+                    ),
+                )
+            ]
+        )
+
+    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+    corpus = [
+        CorpusPaper(
+            "Protein Paper",
+            "We design protein sequences.",
+            datetime(2026, 1, 1),
+            ["protein/design"],
+        )
+    ]
+
+    profiles = generate_topic_profiles_from_corpus(
+        corpus,
+        client,
+        {"language": "English", "generation_kwargs": {"model": "test-model"}},
+        OmegaConf.create({"topic_profiles": {"min_topics": 2, "max_topics": 6}}),
+    )
+
+    assert len(profiles) == 1
+    assert profiles[0].id == "protein_engineering"
+    assert profiles[0].description == "Design proteins across\nmultiple lines."
+
+
 def test_generate_topic_profiles_from_corpus_falls_back_to_collection_paths_on_llm_error():
     from zotero_arxiv_daily.topic_profiles import generate_topic_profiles_from_corpus
 

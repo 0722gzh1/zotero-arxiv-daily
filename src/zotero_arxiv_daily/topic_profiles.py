@@ -197,7 +197,7 @@ def _parse_topics_json(content: str) -> list[Any]:
     json_match = re.search(r'\{.*\}', content, flags=re.DOTALL)
     if json_match is None:
         raise ValueError(f"No JSON object found in topic profile response: {content}")
-    data = json.loads(json_match.group(0))
+    data = json.loads(json_match.group(0), strict=False)
     topics = data.get("topics", [])
     if not isinstance(topics, list):
         raise ValueError("topic profile response field 'topics' must be a list")

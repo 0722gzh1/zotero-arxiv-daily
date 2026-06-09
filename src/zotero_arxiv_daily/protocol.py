@@ -195,7 +195,7 @@ class Paper:
         json_match = re.search(r'\{.*\}', content, flags=re.DOTALL)
         if json_match is None:
             raise ValueError(f"No JSON object found in theme review response: {content}")
-        data = json.loads(json_match.group(0))
+        data = json.loads(json_match.group(0), strict=False)
         theme_score = float(data.get("theme_score", 0))
         decision = str(data.get("decision", "drop")).strip().lower()
         matched_topic_id = data.get("matched_topic_id") or getattr(matched_topic, "topic_id", None)

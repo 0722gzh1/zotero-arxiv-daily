@@ -238,3 +238,31 @@ def test_theme_review_defaults_topic_id_from_matched_topic(llm_params):
     assert result.matched_topic_id == "protein_engineering"
     assert result.lane == "peripheral"
     assert result.keep is True
+
+
+def test_theme_review_accepts_unescaped_control_characters(llm_params):
+    def create_theme_review(**kwargs):
+        return SimpleNamespace(
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(
+                        content=(
+                            '{"theme_score": 7.8, "decision": "keep", "lane": "core", '
+                            '"reason": "Matches the topic across\nmultiple evidence lines."}'
+                        ),
+                    ),
+                )
+            ]
+        )
+
+    client = SimpleNamespace(
+        chat=SimpleNamespace(
+            completions=SimpleNamespace(create=create_theme_review),
+        )
+    )
+    paper = make_sample_paper()
+
+    result = paper.generate_theme_review(client, llm_params)
+
+    assert result.keep is True
+    assert result.reason == "Matches the topic across\nmultiple evidence lines."
