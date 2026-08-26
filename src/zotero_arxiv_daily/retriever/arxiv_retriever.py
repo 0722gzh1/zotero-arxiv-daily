@@ -8,6 +8,7 @@ import feedparser
 from tqdm import tqdm
 import multiprocessing
 import os
+import time
 from queue import Empty
 from typing import Any, Callable, TypeVar
 from loguru import logger
@@ -18,6 +19,12 @@ T = TypeVar("T")
 DOWNLOAD_TIMEOUT = (10, 60)
 PDF_EXTRACT_TIMEOUT = 180
 TAR_EXTRACT_TIMEOUT = 180
+
+ARXIV_API_BATCH_SIZE = 10
+ARXIV_BATCH_BASE_DELAY = 20.0
+ARXIV_BATCH_FAILURE_BACKOFF = 60.0
+ARXIV_BATCH_MAX_ATTEMPTS = 4
+ARXIV_BATCH_MAX_BACKOFF = 240.0
 
 
 def _download_file(url: str, path: str) -> None:
@@ -113,7 +120,10 @@ class ArxivRetriever(BaseRetriever):
             raise ValueError("category must be specified for arxiv.")
 
     def _retrieve_raw_papers(self) -> list[ArxivResult]:
-        client = arxiv.Client(num_retries=10, delay_seconds=10)
+        # ArXiv aggressively rate-limits unauthenticated API clients (HTTP 429),
+        # so we use a small in-library retry budget plus a longer manual backoff
+        # between batches, and skip a batch entirely if it still fails.
+        client = arxiv.Client(num_retries=5, delay_seconds=ARXIV_BATCH_BASE_DELAY)
         query = '+'.join(self.config.source.arxiv.category)
         include_cross_list = self.config.source.arxiv.get("include_cross_list", False)
         # Get the latest paper from arxiv rss feed
@@ -130,14 +140,54 @@ class ArxivRetriever(BaseRetriever):
         if self.config.executor.debug:
             all_paper_ids = all_paper_ids[:10]
 
-        # Get full information of each paper from arxiv api
-        bar = tqdm(total=len(all_paper_ids))
-        for i in range(0, len(all_paper_ids), 20):
-            search = arxiv.Search(id_list=all_paper_ids[i:i + 20])
-            batch = list(client.results(search))
-            bar.update(len(batch))
-            raw_papers.extend(batch)
+        total_batches = (len(all_paper_ids) + ARXIV_API_BATCH_SIZE - 1) // ARXIV_API_BATCH_SIZE
+        bar = tqdm(total=len(all_paper_ids), desc="Fetching arxiv metadata")
+        failed_batches: list[tuple[int, str]] = []
+        for batch_index, offset in enumerate(range(0, len(all_paper_ids), ARXIV_API_BATCH_SIZE)):
+            batch_ids = all_paper_ids[offset : offset + ARXIV_API_BATCH_SIZE]
+            search = arxiv.Search(id_list=batch_ids)
+            batch: list[ArxivResult] = []
+            attempt = 0
+            while attempt < ARXIV_BATCH_MAX_ATTEMPTS:
+                try:
+                    batch = list(client.results(search))
+                    break
+                except arxiv.HTTPError as exc:
+                    attempt += 1
+                    status = getattr(getattr(exc, "status_code", None), "value", None) or exc
+                    if attempt >= ARXIV_BATCH_MAX_ATTEMPTS:
+                        logger.warning(
+                            f"ArXiv batch {batch_index + 1}/{total_batches} gave up after "
+                            f"{ARXIV_BATCH_MAX_ATTEMPTS} attempts: {status}"
+                        )
+                        failed_batches.append((batch_index + 1, str(status)))
+                        batch = []
+                        break
+                    backoff = min(
+                        ARXIV_BATCH_FAILURE_BACKOFF * (2 ** (attempt - 1)),
+                        ARXIV_BATCH_MAX_BACKOFF,
+                    )
+                    logger.warning(
+                        f"ArXiv batch {batch_index + 1}/{total_batches} hit {status}; "
+                        f"backing off {backoff:.0f}s (attempt {attempt}/{ARXIV_BATCH_MAX_ATTEMPTS})"
+                    )
+                    time.sleep(backoff)
+            if batch:
+                bar.update(len(batch))
+                raw_papers.extend(batch)
+            else:
+                bar.update(len(batch_ids))
+            if batch_index + 1 < total_batches:
+                time.sleep(ARXIV_BATCH_BASE_DELAY)
         bar.close()
+
+        if failed_batches:
+            logger.warning(
+                f"ArXiv retrieval completed with {len(failed_batches)} failed batch(es): "
+                f"{failed_batches}. Continuing with the {len(raw_papers)} papers that were retrieved."
+            )
+        else:
+            logger.info(f"ArXiv retrieval completed successfully: {len(raw_papers)} papers across {total_batches} batch(es).")
 
         return raw_papers
 
