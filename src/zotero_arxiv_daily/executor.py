@@ -115,20 +115,30 @@ class Executor:
         min_peripheral_score = theme_judge_config.get("min_peripheral_score", min_core_score)
         keep_on_failure = self.config.executor.get("theme_judge_keep_on_failure", False)
         filtered = []
+        dropped = 0
+        failed = 0
+        boundary_dropped = 0
+        score_dropped = 0
         for paper in papers:
             if paper.theme_review is None:
+                failed += 1
                 if keep_on_failure:
                     filtered.append(paper)
                 continue
             if getattr(paper.theme_review, "boundary_violation", False):
+                boundary_dropped += 1
                 continue
             lane = getattr(paper.theme_review, "lane", "core")
             threshold = min_peripheral_score if lane == "peripheral" else min_core_score
             if paper.theme_review.keep and paper.theme_review.theme_score >= threshold:
                 filtered.append(paper)
+            else:
+                score_dropped += 1
         logger.info(
-            f"Selected {len(filtered)} of {len(papers)} papers with "
-            f"core theme score >= {min_core_score} or peripheral theme score >= {min_peripheral_score}"
+            f"Theme review kept {len(filtered)} of {len(papers)} papers: "
+            f"score-dropped={score_dropped}, boundary-dropped={boundary_dropped}, "
+            f"judge-failed={failed} (kept_on_failure={keep_on_failure}), "
+            f"thresholds: core>={min_core_score} peripheral>={min_peripheral_score}"
         )
         return filtered
 
